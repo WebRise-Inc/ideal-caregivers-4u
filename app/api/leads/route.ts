@@ -5,8 +5,10 @@ type LeadPayload = {
   last_name?: string;
   phone?: string;
   email?: string;
+  care_for?: string;
   support?: string;
   timeline?: string;
+  notes?: string;
   consent?: boolean;
   lead_source?: string;
 };
@@ -29,14 +31,16 @@ export async function POST(request: Request) {
     last_name: clean(payload.last_name),
     phone: clean(payload.phone),
     email: clean(payload.email),
+    care_for: clean(payload.care_for),
     support: clean(payload.support),
     timeline: clean(payload.timeline),
+    notes: clean(payload.notes),
     consent: Boolean(payload.consent),
     lead_source: clean(payload.lead_source) || "PPC landing page",
     submitted_at: new Date().toISOString(),
   };
 
-  if (!lead.first_name || !lead.phone || !lead.support || !lead.consent) {
+  if (!lead.first_name || !lead.phone || !lead.care_for || !lead.support || !lead.timeline || !lead.consent) {
     return NextResponse.json(
       { ok: false, error: "Missing required fields" },
       { status: 400 },
