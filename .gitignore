@@ -1,0 +1,16 @@
+.next/
+node_modules/
+.playwright-mcp/
+*.png
+*.jpg
+*.jpeg
+*.webp
+!public/brand/*.png
+!public/brand/*.jpg
+!public/brand/*.jpeg
+!public/brand/*.webp
+!assets/*.png
+!assets/*.jpg
+!assets/*.jpeg
+!assets/*.webp
+npm-debug.log*
