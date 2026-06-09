@@ -88,8 +88,10 @@ export function LeadForm() {
         },
         body: JSON.stringify({
           ...values,
+          idempotencyKey: `ideal-caregivers-${crypto.randomUUID()}`,
           last_name: "",
           lead_source: "PPC landing page",
+          pageUrl: window.location.href,
         }),
       });
 

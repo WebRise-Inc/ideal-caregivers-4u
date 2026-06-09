@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Lato, Nunito_Sans } from "next/font/google";
 import "./globals.css";
 
@@ -16,7 +17,7 @@ const nunitoSans = Nunito_Sans({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://seniorcare.idealcaregivers4u.com"),
+  metadataBase: new URL("https://care.idealcaregivers4u.com"),
   title: "Senior Home Care Ottawa | Ideal Caregivers 4u",
   description:
     "Book a free care assessment with Ideal Caregivers 4u for trusted in-home senior care, dementia care, overnight support, and 24/7 care in Ottawa.",
@@ -39,6 +40,19 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${lato.variable} ${nunitoSans.variable}`}>
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=AW-958175766"
+          strategy="afterInteractive"
+        />
+        <Script id="google-ads-tag" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+
+            gtag('config', 'AW-958175766');
+          `}
+        </Script>
         {children}
       </body>
     </html>
