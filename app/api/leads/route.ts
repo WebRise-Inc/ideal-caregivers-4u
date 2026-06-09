@@ -1,70 +1,160 @@
 import { NextResponse } from "next/server";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 type LeadPayload = {
-  first_name?: string;
-  last_name?: string;
-  phone?: string;
-  email?: string;
-  care_for?: string;
-  support?: string;
-  timeline?: string;
-  notes?: string;
-  consent?: boolean;
-  lead_source?: string;
+  care_for?: unknown;
+  consent?: unknown;
+  email?: unknown;
+  first_name?: unknown;
+  idempotencyKey?: unknown;
+  last_name?: unknown;
+  lead_source?: unknown;
+  notes?: unknown;
+  pageUrl?: unknown;
+  phone?: unknown;
+  support?: unknown;
+  timeline?: unknown;
 };
 
-function clean(value: unknown) {
+function readString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function getConfiguredIntake() {
+  const url = process.env.LEAD_INTAKE_URL?.trim();
+  const apiKey = process.env.LEAD_INTAKE_API_KEY?.trim();
+  const clientId = process.env.LEAD_INTAKE_CLIENT_ID?.trim();
+
+  if (!url || !apiKey) {
+    return undefined;
+  }
+
+  return {
+    apiKey,
+    clientId,
+    url,
+  };
+}
+
 export async function POST(request: Request) {
+  const intake = getConfiguredIntake();
+
+  if (!intake) {
+    console.error("[leads] missing lead intake configuration");
+    return NextResponse.json(
+      { ok: false, error: "Lead intake is not configured" },
+      { status: 500 },
+    );
+  }
+
   let payload: LeadPayload;
 
   try {
     payload = (await request.json()) as LeadPayload;
   } catch {
-    return NextResponse.json({ ok: false, error: "Invalid request" }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "Invalid JSON payload" }, { status: 400 });
   }
 
-  const lead = {
-    first_name: clean(payload.first_name),
-    last_name: clean(payload.last_name),
-    phone: clean(payload.phone),
-    email: clean(payload.email),
-    care_for: clean(payload.care_for),
-    support: clean(payload.support),
-    timeline: clean(payload.timeline),
-    notes: clean(payload.notes),
-    consent: Boolean(payload.consent),
-    lead_source: clean(payload.lead_source) || "PPC landing page",
-    submitted_at: new Date().toISOString(),
-  };
+  const firstName = readString(payload.first_name);
+  const lastName = readString(payload.last_name);
+  const phone = readString(payload.phone);
+  const email = readString(payload.email);
+  const careFor = readString(payload.care_for);
+  const support = readString(payload.support);
+  const timeline = readString(payload.timeline);
+  const notes = readString(payload.notes);
+  const leadSource = readString(payload.lead_source) || "PPC landing page";
+  const pageUrl = readString(payload.pageUrl);
 
-  if (!lead.first_name || !lead.phone || !lead.care_for || !lead.support || !lead.timeline || !lead.consent) {
+  if (
+    !firstName ||
+    !phone ||
+    phone.replace(/\D/g, "").length < 10 ||
+    (email && !isValidEmail(email)) ||
+    !careFor ||
+    !support ||
+    !timeline ||
+    payload.consent !== true
+  ) {
     return NextResponse.json(
-      { ok: false, error: "Missing required fields" },
+      { ok: false, error: "Lead is missing required fields" },
       { status: 400 },
     );
   }
 
-  const webhookUrl = process.env.LEAD_WEBHOOK_URL;
+  const idempotencyKey =
+    readString(payload.idempotencyKey) || `ideal-caregivers-${crypto.randomUUID()}`;
+  const submittedAt = new Date().toISOString();
 
-  if (webhookUrl) {
-    const response = await fetch(webhookUrl, {
-      method: "POST",
+  const upstreamPayload = {
+    ...(intake.clientId ? { clientId: intake.clientId } : {}),
+    externalLeadId: idempotencyKey,
+    fields: {
+      care_for: careFor,
+      contact_consent: "Yes",
+      email,
+      first_name: firstName,
+      full_name: [firstName, lastName].filter(Boolean).join(" "),
+      last_name: lastName,
+      notes,
+      page_url: pageUrl,
+      phone_number: phone,
+      requested_support: support,
+      start_timeline: timeline,
+    },
+    source: `Ideal Caregivers 4u ${leadSource}`,
+    submittedAt,
+  };
+
+  try {
+    const response = await fetch(intake.url, {
+      body: JSON.stringify(upstreamPayload),
+      cache: "no-store",
       headers: {
-        "content-type": "application/json",
+        Authorization: `Bearer ${intake.apiKey}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
       },
-      body: JSON.stringify(lead),
+      method: "POST",
     });
 
     if (!response.ok) {
+      const upstreamText = await response.text();
+
+      console.error("[leads] lead intake rejected submission", {
+        status: response.status,
+        upstreamText: upstreamText.slice(0, 500),
+      });
+
       return NextResponse.json(
-        { ok: false, error: "Lead forwarding failed" },
+        { ok: false, error: "Lead could not be sent" },
         { status: 502 },
       );
     }
-  }
 
-  return NextResponse.json({ ok: true });
+    const result = (await response.json().catch(() => ({}))) as {
+      leadId?: string;
+      ok?: boolean;
+      sourceLeadId?: string;
+    };
+
+    return NextResponse.json({
+      leadId: result.leadId,
+      ok: true,
+      sourceLeadId: result.sourceLeadId,
+    });
+  } catch (error) {
+    console.error("[leads] lead intake request failed", { error });
+
+    return NextResponse.json(
+      { ok: false, error: "Lead could not be sent" },
+      { status: 502 },
+    );
+  }
 }

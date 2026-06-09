@@ -17,7 +17,7 @@ const nunitoSans = Nunito_Sans({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://seniorcare.idealcaregivers4u.com"),
+  metadataBase: new URL("https://care.idealcaregivers4u.com"),
   title: "Senior Home Care Ottawa | Ideal Caregivers 4u",
   description:
     "Book a free care assessment with Ideal Caregivers 4u for trusted in-home senior care, dementia care, overnight support, and 24/7 care in Ottawa.",
